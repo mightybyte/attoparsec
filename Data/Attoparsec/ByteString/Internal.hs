@@ -53,6 +53,7 @@ module Data.Attoparsec.ByteString.Internal
     , runScanner
     , takeWhile
     , takeWhile1
+    , takeWhile1Limit
     , takeTill
 
     -- ** Consume all remaining input
@@ -367,6 +368,45 @@ takeWhile1 p = do
         then takeWhileAcc p [s]
         else return s
 {-# INLINE takeWhile1 #-}
+
+takeWhileAccLimit
+    :: Int
+    -> (Word8 -> Bool)
+    -> [ByteString]
+    -> Parser ByteString
+takeWhileAccLimit limit p = go 0
+ where
+  go n acc
+    | n >= limit = return $ concatReverse acc
+    | otherwise = do
+        s <- B8.takeWhile p <$> get
+        continue <- inputSpansChunks (B.length s)
+        if continue
+          then go (n+1) (s:acc)
+          else return $ concatReverse (s:acc)
+{-# INLINE takeWhileAccLimit #-}
+
+
+-- | Consume input as long as the predicate returns 'True', and return
+-- the consumed input.
+--
+-- This parser requires the predicate to succeed on at least one byte
+-- of input: it will fail if the predicate never returns 'True' or if
+-- there is no input left.
+takeWhile1Limit :: Int -> (Word8 -> Bool) -> Parser ByteString
+takeWhile1Limit n p = do
+  (`when` demandInput) =<< endOfChunk
+  s <- B8.takeWhile p <$> get
+  let len = B.length s
+  if len == 0
+    then fail "takeWhile1Limit"
+    else do
+      advance len
+      eoc <- endOfChunk
+      if eoc
+        then takeWhileAccLimit n p [s]
+        else return s
+{-# INLINE takeWhile1Limit #-}
 
 -- | Match any byte in a set.
 --

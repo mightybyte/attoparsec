@@ -66,6 +66,7 @@ module Data.Attoparsec.ByteString
     , I.runScanner
     , I.takeWhile
     , I.takeWhile1
+    , I.takeWhile1Limit
     , I.takeTill
 
     -- ** Consume all remaining input
